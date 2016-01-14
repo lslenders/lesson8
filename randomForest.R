@@ -43,61 +43,63 @@ modelAll <- lm(VCF ~ band1+band2+band3+band4+band5+band7+ndvi, rasterbrickData, 
 summary(modelAll)
 
 # predictors (bands) probably most important 
-mode357ndvi <- lm(VCF ~ band3+band5+band7, rasterbrickData, na.action=na.omit)
+model357ndvi <- lm(VCF ~ band3+band5+band7, rasterbrickData, na.action=na.omit)
 summary(mode357ndvi)
+# predictionraster & cleaning
+predictVCF <- predict(rasterbrick, model= model357ndvi, na.rm = T)
+predictVCF[ predictVCF < 0 ] <- NA
+
 
 ## plot the predicted tree cover raster ------------------------------------
+# Comparing predicted and original VCF
+# colorPal <- rev(colorRampPalette(c("darkgreen","yellow","brown"))(20)) # Create color palette
+# plot1<-spplot(rasterbrick$VCF, main="Original VCF", col.regions = colorPal, 
+#               sp.layout=list(list("SpatialPolygonsRescale", layout.north.arrow(), #Create north arrow
+#                                   offset=c(850000, 845000), scale=7000, fill=c('white','black')), 
+#                              list("SpatialPolygonsRescale", layout.scale.bar(), #Create scale bar
+#                                   offset=c(842000, 820000), scale=10000, fill=c('white','black')),
+#                              list("sp.text", c(842000, 821500), "0", font=2), #Add text to scale bar
+#                              list("sp.text", c(852000, 821500), "10 km", font=2)))
+# plot2<-spplot(VCFpredict,main="Predicted VCF", col.regions = colorPal, 
+#               sp.layout=list(list("SpatialPolygonsRescale", layout.north.arrow(), 
+#                                   offset=c(850000, 845000), scale=7000, fill=c('white','black')), 
+#                              list("SpatialPolygonsRescale", layout.scale.bar(),
+#                                   offset=c(842000, 820000), scale=10000, fill=c('white','black')),
+#                              list("sp.text", c(842000, 821500), "0", font=2),
+#                              list("sp.text", c(852000, 821500), "10 km", font=2)))
+
+
+
+# compute RMSE -------------------------------------------------
+
+source('R/calculateRMSE.R')
+RMSEprediction <- calculateRMSE(rasterbrick$VCF, predictVCF)
+
+## are the differences between the predicted and actual tree cover the same for all of ----------------
+## the 3 classes we used for the random forest classfication?
+covBrick <- brick(rasterbrick$VCF, predictVCF)
+names(covBrick) <- c("VCF", "predictVCF")
+
+
+# Using the training polygons from the random forest classification, --------------------------
 # load the training polygons 
 load("AdvancedRasterAnalysis-gh-pages/data/trainingPoly.rda")
-# superimpose training polygons onto ndvi plot
-plot(ndvi)
-plot(trainingPoly, add = TRUE)
 
 #'relabel' our training classes
 trainingPoly@data$Code <- as.numeric(trainingPoly@data$Class)
 
 # assign 'Code' values to raster cells (where they overlap)
 classes <- rasterize(trainingPoly, ndvi, field='Code')
-# colors to classes
-cols <- c("orange", "dark green", "light blue")
 
-# plot without a legend
-plot(classes, col=cols, legend=FALSE)
-
-# add a customized legend
-legend("topright", legend=c("cropland", "forest", "wetland"), fill=cols, bg="white")
-
-##
-covBrick <- brick(rasterbrick$band3, rasterbrick$band5, rasterbrick$band7, rasterbrick$ndvi, rasterbrick$VCF)
-names(covBrick) <- c("band3", "band5", "band7", "ndvi", "VCF")
 ## Mask band images by polygons
-covmasked <- mask(covBrick, classes)
+covmaskedVCF <- mask(covBrick, classes)
 
-# combine this new brick with the classes layer to make our input training dataset
+# combine this new brick with the classes layer for selection on class later
 names(classes) <- "class"
-covBrick <- addLayer(covmasked, classes)
-plot(covBrick)
 
-# extract all values into a matrix and remove NA values from valuetable
-valuetable <- getValues(covBrick)
-valuetable <- na.omit(valuetable)
-
-##Convert values to data frame
-df_valuetable <- as.data.frame(valuetable)
-range(df_valuetable$class)
-
-
-df_valuetable$class <- factor(df_valuetable$class, levels = c(1:3)) ## must WHY ??? 
-
-val_crop <- subset(df_valuetable, class == 1)
-val_forest <- subset(df_valuetable, class == 2)
-val_wetland <- subset(df_valuetable, class == 3)
-
-
-
-# compare with the original VCF raster 
-..
-
+# find mean per class
+mean <- zonal(covmaskedVCF, classes, fun=mean, na.rm=T)
+sqrt((mean[ ,"VCF"] - mean[ ,"predictVCF"])^2)
 
 
 
