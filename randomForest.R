@@ -97,9 +97,15 @@ covmaskedVCF <- mask(covBrick, classes)
 # combine this new brick with the classes layer for selection on class later
 names(classes) <- "class"
 
-# find mean per class
-mean <- zonal(covmaskedVCF, classes, fun=mean, na.rm=T)
-sqrt((mean[ ,"VCF"] - mean[ ,"predictVCF"])^2)
 
+## calculate zonal RMSE
 
+differenceOfSquares <- function() {
+  (covmaskedVCF$VCF - covmaskedVCF$predictVCF)^2 -> squaredDifferences
+  averageSquaredDifferences <- zonal(squaredDifferences, classes, fun=mean, na.rm=T)
+  RMSE <- sqrt(averageSquaredDifferences[, 2])
+  return(RMSE)
+}
+
+differenceOfSquares()
 
