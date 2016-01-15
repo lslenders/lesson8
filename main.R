@@ -17,4 +17,10 @@ dir.create('output/')
 
 #tutorial: 
 
+install.packages('knitr', dependencies = TRUE)
+# update all existing packages first
+update.packages(ask = FALSE, repos = 'http://cran.rstudio.org')
+install.packages('knitr', repos = c('http://yihui.name/xran', 'http://cran.rstudio.org'))
 
+
+install.packages("rmarkdown")
